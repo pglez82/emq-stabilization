@@ -336,6 +336,7 @@ class EMQEntropyReg(EMQ):
                  recalib=None, n_jobs=None, callback=None, eta=0.01, lr=0.1, max_inner_iter=100):
         super().__init__(classifier, val_split, exact_train_prev, recalib, n_jobs, callback)
         self.eta = eta
+        print(eta)
         self.lr = lr
         self.max_inner_iter = max_inner_iter
 
@@ -365,7 +366,10 @@ class EMQEntropyReg(EMQ):
             Q_hat = ps.mean(axis=0)  # standard M-step estimate
 
             # --- M-step: optimize entropy-regularized objective ---
-            qs = cls._optimize_with_entropy(Q_hat, eta=eta, lr=lr, max_iter=max_inner_iter)
+            if eta == 0.0:
+                qs = Q_hat.copy()
+            else:
+                qs = cls._optimize_with_entropy(Q_hat, eta=eta, lr=lr, max_iter=max_inner_iter)
 
             trajectory.append(qs.copy())
 

@@ -69,6 +69,7 @@ def run_experiments(classifier_types, datasets, fetch_function, sample_size,resu
             ('PSEM',  EMQPosteriorSmoothing(newClassifier(classifier_type)), {**wrap_hyper(grid), **{'epsilon_smoothing': (1e-6, 1e-5, 1e-4)}}),
             ('TSEM',  EMQTempScaling(newClassifier(classifier_type)), {**wrap_hyper(grid), **{'tau': (0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 2.0, 3.0, 5.0)}}),
             ('EREM',  EMQEntropyReg(newClassifier(classifier_type)), {**wrap_hyper(grid),**{'eta' : (0.0, 1e-4, 1e-3, 1e-2, 0.05, 0.1, 0.2, 0.5)}}),
+            ('EREMv2',  EMQEntropyReg(newClassifier(classifier_type)), {**wrap_hyper(grid),**{'eta' : (0.0,0.0001,0.001)}}),
             ('DMAPEM', EMQDirichletMAP(newClassifier(classifier_type)), {**wrap_hyper(grid), **{'alpha': (1.0, 1.01, 1.1, 1.5, 2.0)}}),
             ('CSEM', EMQConfidentSubset(newClassifier(classifier_type)), {**wrap_hyper(grid), **{'tau': (0.5)}}),
         ]
@@ -127,7 +128,8 @@ def run_experiments(classifier_types, datasets, fetch_function, sample_size,resu
                             print(f'best score {modsel.best_score_}')
 
                             quantifier = modsel.best_model()
-                        except:
+                        except Exception as e:
+                            print(e)
                             print('something went wrong... trying to fit the default model')
                             quantifier.fit(train)
                         timings[method_name][dataset] = time() - t_init
