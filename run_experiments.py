@@ -71,7 +71,8 @@ def run_experiments(classifier_types, datasets, fetch_function, sample_size,resu
             ('EREM',  EMQEntropyReg(newClassifier(classifier_type)), {**wrap_hyper(grid),**{'eta' : (0.0, 1e-4, 1e-3, 1e-2, 0.05, 0.1, 0.2, 0.5)}}),
             ('EREMv2',  EMQEntropyReg(newClassifier(classifier_type)), {**wrap_hyper(grid),**{'eta' : (0.0,0.0001,0.001)}}),
             ('DMAPEM', EMQDirichletMAP(newClassifier(classifier_type)), {**wrap_hyper(grid), **{'alpha': (1.0, 1.01, 1.1, 1.5, 2.0)}}),
-            ('CSEM', EMQConfidentSubset(newClassifier(classifier_type)), {**wrap_hyper(grid), **{'tau': (0.5)}}),
+            ('DMAPEMv2', EMQDirichletMAP(newClassifier(classifier_type)), {**wrap_hyper(grid), **{'alpha': (0.1, 0.3, 0.5, 1.0, 2.0, 5.0, 10.0)}}),
+            ('CSEMv2', EMQConfidentSubset(newClassifier(classifier_type)), {**wrap_hyper(grid), **{'tau': (0.3,0.5,0.8,1)}}),
         ]
 
         methods_for_classifier = [(name + '_' + classifier_type, quant,grid) for name, quant, grid in methods_for_classifier]

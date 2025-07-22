@@ -7,7 +7,7 @@ from scipy.stats import wilcoxon
 # === CONFIGURATION ===
 DATA_DIR = "results/ucimulti"
 
-methods = ['EM','EM_BCTS','PSEM','TSEM','DMAPEM','DEM','CSEM','EREMv2']
+methods = ['EM','EM_BCTS','PSEM','TSEM','DMAPEMv2','DEM','CSEMv2','EREMv2']
 labels = ['EMQ','Calib','Smooth','Temp','MAP','Damp','Conf','Ent']
 classifiers = ["LR", "NN"]
 datasets = qp.datasets.UCI_MULTICLASS_DATASETS
