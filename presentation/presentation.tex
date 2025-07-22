@@ -1,0 +1,246 @@
+% EMQ Stabilization Presentation (15‑minute)
+\documentclass[aspectratio=169]{beamer}
+\usetheme{Madrid}
+\usepackage[utf8]{inputenc}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{xcolor}
+\usepackage[linesnumbered,ruled,vlined]{algorithm2e}
+\title[Stabilizing EM‑Based Quantification]{Stabilizing EM‑Based Quantification under Label Shift}
+\author{Pablo González \textit{et al.}}
+\institute[AI Center, Uni. Oviedo]{Artificial Intelligence Center\\University of Oviedo}
+\date{LQ 2025 · \today}
+
+\begin{document}
+
+%---------------------------------------------------------
+\begin{frame}
+  \titlepage
+\end{frame}
+
+%---------------------------------------------------------
+\begin{frame}{Motivation}
+  \begin{itemize}
+    \item \alert{Quantification goal}: estimate \textbf{class prevalences} in an \emph{unlabelled} target sample.
+    \item \textbf{Assumptions} for most quantification methods:
+          \begin{enumerate}
+            \item \textbf{Prior probability shift}: $P(X\mid Y)=Q(X\mid Y)$ while $P(Y)\neq Q(Y)$.
+            %\item \textbf{Well‑calibrated posteriors}: we can obtain reliable estimates of $p(y\mid x)$ from a source classifier.
+          \end{enumerate}
+    \item Under these conditions,  \textbf{EMQ}
+          \begin{itemize}
+            \item coincides with the maximum‑likelihood estimator,
+            \item is \emph{Fisher‑consistent}: perfect estimation as the sample size grows,
+            \item fast and a very strong baseline for quantification problems.
+          \end{itemize}
+    \item Yet, in practical problems, mild violations of the assumptions (e.g.\ mis‑calibration of the underlying classifier) can lead to oscillations and degenerate estimates $\Rightarrow$ motivation for stabilization.
+  \end{itemize}
+\end{frame}
+
+%---------------------------------------------------------
+\begin{frame}{Baseline: EMQ}
+  EM is an iterative algorithm that uses Bayes’ rule to estimate the target class distribution $Q(c)$ by alternating between two steps:
+  
+  \begin{itemize}
+    \item $Q(c)$: Prevalence of class $c$ in the target set.
+    \item $s_i(c)$: Score (e.g., soft prediction) assigned to class $c$ by the classifier for instance $i$.
+    \item $q_i^{(t)}(c)$: Estimated probability that instance $i$ belongs to class $c$ at iteration $t$.
+  \end{itemize}
+
+  \begin{columns}
+    \begin{column}{0.4\textwidth}
+      \begin{block}{E‑step (Expectation)}
+        \small
+        Update instance-level posteriors:
+        $$q_i^{(t)}(c)=\frac{Q^{(t)}(c)\,s_i(c)}{\sum_{j}Q^{(t)}(j)\,s_i(j)}$$
+      \end{block}
+    \end{column}
+    \begin{column}{0.4\textwidth}
+      \begin{block}{M‑step (Maximization)}
+        \small
+        Update class prevalences:
+        $$Q^{(t+1)}(c)=\frac{1}{N}\sum_i q_i^{(t)}(c)$$
+      \end{block}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+
+%---------------------------------------------------------
+\begin{frame}{Practical Limitations of EMQ}
+  Although EMQ is a theoretically sound and widely adopted baseline, its practical performance is often mixed, especially in real-world settings:
+
+  \begin{itemize}
+    \item Highly sensitive to \textbf{mis‑calibrated} posteriors.
+    \item Tends to produce \textbf{degenerate estimates} when some classes are rare in the test distribution.
+    \item In the \textbf{multiclass} setting, errors can propagate and compound across classes.\pause
+    \item \textbf{Empirical studies} in the literature report strong performance in some datasets, but also significant failures in others (even when a good calibrator is used).
+  \end{itemize}
+\end{frame}
+
+
+%---------------------------------------------------------
+\begin{frame}{Our Contributions}
+  \begin{enumerate}
+    \item \textbf{Unified Framework}: Decompose EMQ into two modular components:
+          \begin{itemize}
+            \item E-step: \textit{Posterior Transformation} $\mathcal{C}$
+            \item M-step: \textit{Prevalence Update} $\mathcal{U}$
+          \end{itemize}
+    \item Systematic taxonomy of existing \& novel stabilisation heuristics.
+    \item Exhaustive evaluation on 20+ UCI datasets with LR and NN classifiers.
+  \end{enumerate}
+\end{frame}
+
+%---------------------------------------------------------
+\begin{frame}[fragile]{Unified EMQ Framework}
+\fontsize{8.5}{8.5}\selectfont
+\begin{algorithm}[H]
+\DontPrintSemicolon
+\SetAlgoNoLine % optional: removes vertical lines
+\SetNlSty{}{\color{gray}}{} % makes line numbers subtle (optional)
+\KwIn{Unlabeled instances $\mathcal{D}_T = \{x_1, \ldots, x_n\}$, classifier posteriors $s_i(c)$, \textcolor{red}{posterior transformation} $\mathcal{C}$, \textcolor{red}{update function} $\mathcal{U}$}
+\KwOut{Estimated target class prevalences $Q(Y)$}
+Initialize prevalence estimate $Q^{(0)} \in \Delta^K$\;
+\Repeat{convergence}{
+  \ForEach{instance $x_i \in \mathcal{D}_T$}{
+    Apply posterior transformation: \\
+    $\tilde{s}_i(c) \gets \textcolor{red}{\mathcal{C}}(s_i)(c)$\;
+    Compute reweighted posterior: \\
+    $q^{(t)}_i(c) \gets \dfrac{Q^{(t)}(c) \cdot \tilde{s}_i(c)}{\sum_{j=1}^K Q^{(t)}(j) \cdot \tilde{s}_i(j)}$\;
+  }
+  Compute raw prevalence update: \\
+  $\hat{Q}^{(t+1)}(c) \gets \dfrac{1}{n} \sum_{i=1}^n q^{(t)}_i(c)$\;
+  Update prevalence estimate: \\
+  $Q^{(t+1)} \gets \textcolor{red}{\mathcal{U}}\bigl(Q^{(t)}, \hat{Q}^{(t+1)}\bigr)$\;
+}
+\Return $Q^{(t+1)}$\;
+\caption{Unified EMQ Framework}
+\end{algorithm}
+\end{frame}
+
+
+%---------------------------------------------------------
+\begin{frame}{E‑Step Heuristics ($\mathcal{C}$)}
+  \begin{itemize}
+    \item \textbf{Calibration (BCTS)}: Applies a post-processing transformation to classifier scores to improve reliability.\\
+    \small Used only once before EM begins and helps align $s_i(c)$ with true posteriors (not part of the framework).
+    \normalsize
+
+    \item \textbf{Posterior Smoothing}: $\tilde{s}_i(c)\! \leftarrow\! (s_i(c)+\varepsilon)/(1+K\varepsilon)$\\
+    \small Prevents zero probabilities and softens overconfident predictions, especially useful when some classes are rare or underrepresented.
+    \normalsize
+
+    \item \textbf{Temperature Scaling}: $\tilde{s}_i(c) \leftarrow s_i(c)^{\tau}$ then renormalize\\
+    \small Dynamically flattens (or sharpens) the score distribution during EM. 
+    \small Applies a power transformation to soften or sharpen posteriors during EM:\\
+    - \( \tau > 1 \): flattens the distribution, reducing overconfidence.\\
+    - \( \tau < 1 \): sharpens the distribution, making predictions more confident.\\Helps mitigate overconfident predictions and stabilizes updates.
+  \end{itemize}
+\end{frame}
+
+
+%---------------------------------------------------------
+% REVISAR NOTACIÓN%
+\begin{frame}{M‑Step Heuristics ($\mathcal{U}$)}
+  \begin{itemize}
+    \item \textbf{MAP / Dirichlet Prior}: Add $\alpha$-1 pseudo-counts to the prevalence update $Q^{(t+1)}(c) = \frac{\sum_{i=1}^N q_i^{(t)}(c) + \alpha - 1}{N + K(\alpha - 1)}$.
+    When $\alpha>1$, the prevalence updates are pulled towards the uniform distribution. When $\alpha<1$, the prevalence updates are more peaked.\\
+    \normalsize
+
+    \item \textbf{Damping}: Blend the new estimate with the previous one $Q^{(t+1)} \gets (1-\lambda) Q^{(t)} + \lambda \hat{Q}^{(t+1)}$   \\
+    
+    \small Slows down updates to avoid abrupt changes; effective for noisy or unstable posteriors.
+    \normalsize
+
+    \item \textbf{Confidence Selection}: Use only the most confident instances to compute $Q^{(t+1)}$.\\
+    \small Reduces the influence of uncertain predictions, filtering top-$\tau$ instances with highest max-score.
+    \normalsize
+
+    \item \textbf{Entropy Regularisation}: Encourages high-entropy (i.e., smoother) prevalence vectors:\\
+    \[
+        \arg\max_Q \sum_{c=1}^K \hat{Q}(c) \log Q(c) + \eta H(Q)
+    \]
+    \small Acts as a regularizer to prevent overconfident or peaked estimates. $\eta$ controls the strength of the penalty.
+  \end{itemize}
+\end{frame}
+
+
+%---------------------------------------------------------
+\begin{frame}{Experimental Setup}
+  \begin{itemize}
+    \item \textbf{Datasets}: 24 multiclass UCI datasets, test bags = 1000 (per dataset), bag size = 500.
+    \item \textbf{Classifiers}: Logistic Regression (LR) and Feed‑forward NN (NN).
+    \item \textbf{Metric}: Mean Absolute Error (MAE).
+    \item \textbf{Hyper‑parameters}: tuned on validation bags via \textit{QuaPy}.
+        \begin{itemize}
+            \item \texttt{EM}, \texttt{EM\_BCTS}: classifier hyperparameters only.
+            \item \texttt{Damping}: $\lambda \in [0.1, 0.2, \dots, 0.9]$.
+            \item \texttt{Posterior smoothing}: $\varepsilon \in \{10^{-6}, 10^{-5}, 10^{-4}\}$.
+            \item \texttt{Temperature scaling}: $\tau \in \{0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 2.0, 3.0, 5.0\}$.
+            \item \texttt{Entropy regularization}: $\eta \in \{0.0, 10^{-4}, 10^{-3}\}$.
+            \item \texttt{MAP}: $\alpha \in \{0.1, 0.3, 0.5, 1.0, 2.0, 5.0, 10.0\}$.
+            \item \texttt{Confiedence selection}: $\tau \in \{0.3, 0.5, 0.8, 1\}$.
+        \end{itemize}
+  \end{itemize}
+\end{frame}
+
+
+%---------------------------------------------------------
+\begin{frame}{Overall Results (LR)}
+  \centering
+  \includegraphics[width=0.6\linewidth]{images/results_lr.png}
+\end{frame}
+
+%---------------------------------------------------------
+\begin{frame}{Overall Results (NN)}
+  \centering
+  \includegraphics[width=0.6\linewidth]{images/results_nn.png}
+\end{frame}
+
+\begin{frame}{Bag-level: statistical analysis}
+  \centering
+  \includegraphics[width=0.6\linewidth]{images/statistical_analysis.png}
+\end{frame}
+
+\begin{frame}{Dataset level: Win-ties-losses charts}
+  \centering
+    \includegraphics[width=0.9\linewidth]{images/datasetlevel.png}
+
+  
+\end{frame}
+
+%---------------------------------------------------------
+\begin{frame}{Key Insights}
+  \begin{itemize}
+    \item \textbf{Classifier and data specific}: even though some heuristic show some pretty consistent results like \textit{Entropy regularization} or \textit{MAP}, they should be considered based on the data.
+    \item \textbf{Modularity}: heuristics can act like hyper‑parameters, using a grid search to enable automatic selection.
+    \item \textbf{Proposed framework}: it allows the design of new heuristics by combining existing ones, e.g., \textit{MAP + Damping} or \textit{Entropy + Confidence Selection}.
+  \end{itemize}
+\end{frame}
+
+%---------------------------------------------------------
+\begin{frame}{Conclusions and Future work}
+  \begin{itemize}
+    \item We presented a \textbf{unified framework} + extensive heuristic benchmarking.
+    \item Simple heuristics can yield significant improvaments over standard EMQ.
+    \item Future work
+    \begin{itemize} 
+      \item explore the combiantion of heuristics.
+      \item derive consistency guarantees.
+      \item explore heuristics for other types of shifts or situations where basic EMQ might fail.
+    \end{itemize}
+  \end{itemize}
+\end{frame}
+
+%---------------------------------------------------------
+\begin{frame}
+  \centering
+  \Huge
+Questions?\\
+\\
+\vspace{1cm}
+\includegraphics[width=0.6\textwidth]{images/questions.png}
+\end{frame}
+
+\end{document}
