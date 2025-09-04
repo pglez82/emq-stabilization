@@ -203,8 +203,7 @@ class EMQ(AggregativeSoftQuantifier):
             the corrected posterior probabilities (shape `(n_instances, n_classes,)`)
         """
         Px = posterior_probabilities
-        if self.C is not None:
-            Px = self._apply_C(Px)
+        
 
         Ptr = np.copy(tr_prev)
 
@@ -222,6 +221,9 @@ class EMQ(AggregativeSoftQuantifier):
             # E-step:
             ps_unnormalized = (qs / Ptr) * Px
             ps = ps_unnormalized / ps_unnormalized.sum(axis=1, keepdims=True)
+
+            if self.C is not None:
+                ps = self._apply_C(ps)
 
             # M-step:
             qs_new = ps.mean(axis=0)
@@ -254,7 +256,7 @@ def C_TempScaling(posterior_probabilities, tau):
     return Px
 
 def U_Damping(posterior_probabilities, qs, qs_new,damping):
-    return damping * qs + (1 - damping) * qs_new
+    return damping * qs_new + (1 - damping) * qs
 
 def U_DirichLetMAP(posterior_probabilities,qs,qs_new,alpha):
     N = posterior_probabilities.shape[0]
@@ -336,22 +338,35 @@ class EMQConfidentSubset(EMQ):
 
 
 class EMQEntropyReg(EMQ):
-    """
-    EMQ variant with entropy regularization in the M-step.
-    Instead of using the mean of posteriors, it maximizes a regularized objective:
-        L(Q) = <Q_hat, log Q> + eta * H(Q)
-
-    :param eta: regularization strength (eta > 0 favors smoother distributions)
-    :param lr: learning rate for projected gradient ascent
-    :param max_inner_iter: max iterations for inner optimization
-    """
     def __init__(self, classifier=None, val_split=None, exact_train_prev=True,
                  recalib=None, n_jobs=None, callback=None, eta=0.01):
         super().__init__(classifier, val_split, exact_train_prev, recalib, n_jobs, callback)
         self.eta = eta
         self.U = U_EntropyReg
         
+class EMQTempScaling_DirichletMAP(EMQ):
+    def __init__(self, classifier: BaseEstimator=None, val_split=None, exact_train_prev=True, recalib=None, n_jobs=None,callback=None, tau=1.0,alpha=0.5):
+        super().__init__(classifier=classifier, val_split=val_split,exact_train_prev=exact_train_prev,recalib=recalib,n_jobs=n_jobs,callback=callback)
+        self.tau=tau
+        self.alpha=alpha
+        self.U = U_DirichLetMAP
+        self.C = C_TempScaling
 
+class EMQTempScaling_EntropyReg(EMQ):
+    def __init__(self, classifier: BaseEstimator=None, val_split=None, exact_train_prev=True, recalib=None, n_jobs=None,callback=None, tau=1.0,eta=0.01):
+        super().__init__(classifier=classifier, val_split=val_split,exact_train_prev=exact_train_prev,recalib=recalib,n_jobs=n_jobs,callback=callback)
+        self.tau=tau
+        self.eta=eta
+        self.U = U_EntropyReg
+        self.C = C_TempScaling
+
+class EMQTempScaling_Damping(EMQ):
+    def __init__(self, classifier: BaseEstimator=None, val_split=None, exact_train_prev=True, recalib=None, n_jobs=None,callback=None, tau=1.0,damping=0.5):
+        super().__init__(classifier=classifier, val_split=val_split,exact_train_prev=exact_train_prev,recalib=recalib,n_jobs=n_jobs,callback=callback)
+        self.tau=tau
+        self.damping=damping
+        self.U = U_Damping
+        self.C = C_TempScaling
     
     
 

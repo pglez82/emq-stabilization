@@ -9,6 +9,7 @@ from sklearn.neural_network import MLPClassifier
 
 import quapy as qp
 from methods_v2 import EMQ, EMQPosteriorSmoothing, EMQTempScaling, EMQDamping,EMQDirichletMAP, EMQConfidentSubset,EMQEntropyReg
+from methods_v2 import EMQTempScaling_DirichletMAP, EMQTempScaling_EntropyReg, EMQTempScaling_Damping
 from quapy.model_selection import GridSearchQ
 from quapy.protocol import UPP
 from pathlib import Path
@@ -58,28 +59,48 @@ def load_timings(result_path):
     df = pd.read_csv(result_path+'.csv', sep='\t')
     return timings | df.pivot_table(index='Dataset', columns='Method', values='t_train').to_dict()
 
+def get_heuristic_parameters(heuristic):
+    if heuristic == 'PSEM':
+        return {'epsilon_smoothing': (0, 1e-6, 1e-5, 1e-4)}
+    elif heuristic == 'TSEM':
+        return {'tau': (0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 2.0, 3.0, 5.0)}
+    elif heuristic == 'DEM':
+        return {'damping': np.linspace(0.1, 1, 9)}
+    elif heuristic == 'EREM':
+        return {'eta' : (0.0,0.0001,0.001)}
+    elif heuristic == 'DMAPEM':
+        return {'alpha': (1.0, 2.0, 5.0, 10.0)}
+    elif heuristic == 'CSEM':
+        return {'tau': (0.3,0.5,0.8,1)}
+    else:
+        raise ValueError(f"Unknown heuristic: {heuristic}")
 
-def run_experiments(classifier_types, datasets, fetch_function, sample_size,result_dir):
+
+def run_experiments(classifier_types, datasets, fetch_function, sample_size,result_dir, experiment_type='simpleheuristics'):
     #delete all pkl files in trajectories directory
-    for file in os.listdir('trajectories'):
-        if file.startswith('trajectory') and file.endswith('.pkl'):
-            os.remove(os.path.join('trajectories', file))
-        if file.startswith('pcc') and file.endswith('.pkl'):
-            os.remove(os.path.join('trajectories', file))
+    # for file in os.listdir('trajectories'):
+    #     if file.startswith('trajectory') and file.endswith('.pkl'):
+    #         os.remove(os.path.join('trajectories', file))
 
     METHODS = []
     for classifier_type in classifier_types:
         grid = gridsearch_params(classifier_type)
-        methods_for_classifier = [
-            ('EM',  EMQ(newClassifier(classifier_type)), wrap_hyper(grid)),
-            ('PSEM',  EMQPosteriorSmoothing(newClassifier(classifier_type)), {**wrap_hyper(grid), **{'epsilon_smoothing': (1e-6, 1e-5, 1e-4)}}),
-            ('EM_BCTS',  EMQ(newClassifier(classifier_type),recalib='bcts'), wrap_hyper(grid)),
-            ('DEM',  EMQDamping(newClassifier(classifier_type)), {**wrap_hyper(grid), **{'damping': np.linspace(0.1, 0.9, 9)}}),
-            ('TSEM',  EMQTempScaling(newClassifier(classifier_type)), {**wrap_hyper(grid), **{'tau': (0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 2.0, 3.0, 5.0)}}),
-            ('EREM',  EMQEntropyReg(newClassifier(classifier_type)), {**wrap_hyper(grid),**{'eta' : (0.0,0.0001,0.001)}}),
-            ('DMAPEM', EMQDirichletMAP(newClassifier(classifier_type)), {**wrap_hyper(grid), **{'alpha': (0.1, 0.3, 0.5, 1.0, 2.0, 5.0, 10.0)}}),
-            ('CSEM', EMQConfidentSubset(newClassifier(classifier_type)), {**wrap_hyper(grid), **{'tau': (0.3,0.5,0.8,1)}}),
-        ]
+
+        if experiment_type=='simpleheuristics':
+            methods_for_classifier = [
+                ('EM',  EMQ(newClassifier(classifier_type)), wrap_hyper(grid)),
+                ('EM_BCTS',  EMQ(newClassifier(classifier_type),recalib='bcts'), wrap_hyper(grid)),
+                ('PSEM',  EMQPosteriorSmoothing(newClassifier(classifier_type)), {**wrap_hyper(grid), **get_heuristic_parameters('PSEM')}),
+                ('TSEM',  EMQTempScaling(newClassifier(classifier_type)), {**wrap_hyper(grid), **get_heuristic_parameters('TSEM')}),
+                ('DEM',  EMQDamping(newClassifier(classifier_type)), {**wrap_hyper(grid), **get_heuristic_parameters('DEM')}),
+                ('EREM',  EMQEntropyReg(newClassifier(classifier_type)), {**wrap_hyper(grid),**get_heuristic_parameters('EREM')}),
+                ('DMAPEM', EMQDirichletMAP(newClassifier(classifier_type)), {**wrap_hyper(grid), **get_heuristic_parameters('DMAPEM')}),
+                ('CSEM', EMQConfidentSubset(newClassifier(classifier_type)), {**wrap_hyper(grid), **get_heuristic_parameters('CSEM')}),
+            ]
+        elif experiment_type=='combinations':
+            ('TSEM_DEM', EMQTempScaling_Damping(newClassifier(classifier_type)), {**wrap_hyper(grid), **get_heuristic_parameters('TSEM'),**get_heuristic_parameters('DEM')}),
+            ('TSEM_EREM', EMQTempScaling_EntropyReg(newClassifier(classifier_type)), {**wrap_hyper(grid), **get_heuristic_parameters('TSEM'),**get_heuristic_parameters('EREM')}),
+            ('TSEM_DMAPEM', EMQTempScaling_DirichletMAP(newClassifier(classifier_type)), {**wrap_hyper(grid), **get_heuristic_parameters('TSEM'),**get_heuristic_parameters('DMAPEM')}),
 
         methods_for_classifier = [(name + '_' + classifier_type, quant,grid) for name, quant, grid in methods_for_classifier]
         METHODS.extend(methods_for_classifier)
@@ -102,7 +123,7 @@ def run_experiments(classifier_types, datasets, fetch_function, sample_size,resu
 
         with open(global_result_path + '.csv', 'at') as csv:
 
-            for dataset in ("abalone","academic-success",):
+            for dataset in datasets:
 
                 print('init', dataset)
 
@@ -161,5 +182,6 @@ def run_experiments(classifier_types, datasets, fetch_function, sample_size,resu
     show_results(global_result_path)
 
 if __name__ == '__main__':
-    run_experiments(('LR',),qp.datasets.UCI_MULTICLASS_DATASETS,qp.datasets.fetch_UCIMulticlassDataset, 500, 'results/ucimulti')
+    run_experiments(('LR','NN'),qp.datasets.UCI_MULTICLASS_DATASETS,qp.datasets.fetch_UCIMulticlassDataset, 500, 'results/ucimulti','simpleheuristics')
+    run_experiments(('LR','NN'),qp.datasets.UCI_MULTICLASS_DATASETS,qp.datasets.fetch_UCIMulticlassDataset, 500, 'results/ucimulti','combinations')
     #run_experiments(qp.datasets.UCI_BINARY_DATASETS,qp.datasets.fetch_UCIBinaryDataset, 100, 'results/ucibinary')
