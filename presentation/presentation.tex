@@ -23,10 +23,10 @@
   \begin{itemize}
     \item \alert{Quantification goal}: estimate \textbf{class prevalences} in an \emph{unlabelled} target sample.
     \item \textbf{Assumptions} for most quantification methods:
-          \begin{enumerate}
+          \begin{itemize}
             \item \textbf{Prior probability shift}: $P(X\mid Y)=Q(X\mid Y)$ while $P(Y)\neq Q(Y)$.
             %\item \textbf{Well‑calibrated posteriors}: we can obtain reliable estimates of $p(y\mid x)$ from a source classifier.
-          \end{enumerate}
+          \end{itemize}
     \item Under these conditions,  \textbf{EMQ}
           \begin{itemize}
             \item coincides with the maximum‑likelihood estimator,
@@ -73,7 +73,7 @@
   \begin{itemize}
     \item Highly sensitive to \textbf{mis‑calibrated} posteriors.
     \item Tends to produce \textbf{degenerate estimates} when some classes are rare in the test distribution.
-    \item In the \textbf{multiclass} setting, errors can propagate and compound across classes.\pause
+    \item In the \textbf{multiclass} setting, errors can propagate and compound across classes.
     \item \textbf{Empirical studies} in the literature report strong performance in some datasets, but also significant failures in others (even when a good calibrator is used).
   \end{itemize}
 \end{frame}
@@ -87,7 +87,7 @@
             \item E-step: \textit{Posterior Transformation} $\mathcal{C}$
             \item M-step: \textit{Prevalence Update} $\mathcal{U}$
           \end{itemize}
-    \item Systematic taxonomy of existing \& novel stabilisation heuristics.
+    \item Systematic taxonomy of existing \& novel stabilisation heuristics (both for the E-step and the M-step).
     \item Exhaustive evaluation on 20+ UCI datasets with LR and NN classifiers.
   \end{enumerate}
 \end{frame}
@@ -157,7 +157,7 @@ Initialize prevalence estimate $Q^{(0)} \in \Delta^K$\;
     \small Reduces the influence of uncertain predictions, filtering top-$\tau$ instances with highest max-score.
     \normalsize
 
-    \item \textbf{Entropy Regularisation}: Encourages high-entropy (i.e., smoother) prevalence vectors:\\
+    \item \textbf{Entropy Regularization}: Encourages high-entropy (i.e., smoother) prevalence vectors:\\
     \[
         \arg\max_Q \sum_{c=1}^K \hat{Q}(c) \log Q(c) + \eta H(Q)
     \]
@@ -226,7 +226,7 @@ Initialize prevalence estimate $Q^{(0)} \in \Delta^K$\;
     \item Simple heuristics can yield significant improvaments over standard EMQ.
     \item Future work
     \begin{itemize} 
-      \item explore the combiantion of heuristics.
+      \item explore the combination of heuristics.
       \item derive consistency guarantees.
       \item explore heuristics for other types of shifts or situations where basic EMQ might fail.
     \end{itemize}
