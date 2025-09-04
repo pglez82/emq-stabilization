@@ -12,3 +12,5 @@ __pycache__
 *.nav
 *.snm  
 *.pdf
+trajectories
+bag_level_summary.tex
