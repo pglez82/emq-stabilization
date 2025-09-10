@@ -9,7 +9,7 @@ from sklearn.neural_network import MLPClassifier
 
 import quapy as qp
 from methods_v2 import EMQ, EMQPosteriorSmoothing, EMQTempScaling, EMQDamping,EMQDirichletMAP, EMQConfidentSubset,EMQEntropyReg
-from methods_v2 import EMQTempScaling_DirichletMAP, EMQTempScaling_EntropyReg, EMQTempScaling_Damping
+from methods_v2 import EMQTempScaling_DirichletMAP, EMQTempScaling_EntropyReg, EMQTempScaling_Damping, EMQPosteriorSmoothing_DirichletMAP, EMQPosteriorSmoothing_EntropyReg, EMQPosteriorSmoothing_Damping
 from quapy.model_selection import GridSearchQ
 from quapy.protocol import UPP
 from pathlib import Path
@@ -23,7 +23,7 @@ def newClassifier(type='LR'):
     if type == 'LR':
         return LogisticRegression(max_iter=3000, random_state=SEED)
     elif type == 'NN':
-        return MLPClassifier(hidden_layer_sizes=(100,), max_iter=3000, random_state=SEED)
+        return MLPClassifier(hidden_layer_sizes=(100,), max_iter=3000,early_stopping=True,validation_fraction=0.15,n_iter_no_change=20,tol=1e-4,random_state=SEED)
     else:
         raise ValueError(f"Unknown classifier type: {type}")
 
@@ -98,10 +98,22 @@ def run_experiments(classifier_types, datasets, fetch_function, sample_size,resu
                 ('CSEM', EMQConfidentSubset(newClassifier(classifier_type)), {**wrap_hyper(grid), **get_heuristic_parameters('CSEM')}),
             ]
         elif experiment_type=='combinations':
-            ('TSEM_DEM', EMQTempScaling_Damping(newClassifier(classifier_type)), {**wrap_hyper(grid), **get_heuristic_parameters('TSEM'),**get_heuristic_parameters('DEM')}),
-            ('TSEM_EREM', EMQTempScaling_EntropyReg(newClassifier(classifier_type)), {**wrap_hyper(grid), **get_heuristic_parameters('TSEM'),**get_heuristic_parameters('EREM')}),
-            ('TSEM_DMAPEM', EMQTempScaling_DirichletMAP(newClassifier(classifier_type)), {**wrap_hyper(grid), **get_heuristic_parameters('TSEM'),**get_heuristic_parameters('DMAPEM')}),
-
+            methods_for_classifier = [
+                ('EM',  EMQ(newClassifier(classifier_type)), wrap_hyper(grid)),
+                ('EM_BCTS',  EMQ(newClassifier(classifier_type),recalib='bcts'), wrap_hyper(grid)),
+                ('PSEM',  EMQPosteriorSmoothing(newClassifier(classifier_type)), {**wrap_hyper(grid), **get_heuristic_parameters('PSEM')}),
+                ('TSEM',  EMQTempScaling(newClassifier(classifier_type)), {**wrap_hyper(grid), **get_heuristic_parameters('TSEM')}),
+                ('DEM',  EMQDamping(newClassifier(classifier_type)), {**wrap_hyper(grid), **get_heuristic_parameters('DEM')}),
+                ('EREM',  EMQEntropyReg(newClassifier(classifier_type)), {**wrap_hyper(grid),**get_heuristic_parameters('EREM')}),
+                ('DMAPEM', EMQDirichletMAP(newClassifier(classifier_type)), {**wrap_hyper(grid), **get_heuristic_parameters('DMAPEM')}),
+                ('CSEM', EMQConfidentSubset(newClassifier(classifier_type)), {**wrap_hyper(grid), **get_heuristic_parameters('CSEM')}),
+                ('TSEM_DEM', EMQTempScaling_Damping(newClassifier(classifier_type)), {**wrap_hyper(grid), **get_heuristic_parameters('TSEM'),**get_heuristic_parameters('DEM')}),
+                ('TSEM_EREM', EMQTempScaling_EntropyReg(newClassifier(classifier_type)), {**wrap_hyper(grid), **get_heuristic_parameters('TSEM'),**get_heuristic_parameters('EREM')}),
+                ('TSEM_DMAPEM', EMQTempScaling_DirichletMAP(newClassifier(classifier_type)), {**wrap_hyper(grid), **get_heuristic_parameters('TSEM'),**get_heuristic_parameters('DMAPEM')}),
+                ('PSEM_DEM', EMQPosteriorSmoothing_Damping(newClassifier(classifier_type)), {**wrap_hyper(grid), **get_heuristic_parameters('PSEM'),**get_heuristic_parameters('DEM')}),
+                ('PSEM_EREM', EMQPosteriorSmoothing_EntropyReg(newClassifier(classifier_type)), {**wrap_hyper(grid), **get_heuristic_parameters('PSEM'),**get_heuristic_parameters('EREM')}),
+                ('PSEM_DMAPEM', EMQPosteriorSmoothing_DirichletMAP(newClassifier(classifier_type)), {**wrap_hyper(grid), **get_heuristic_parameters('PSEM'),**get_heuristic_parameters('DMAPEM')}),
+            ]
         methods_for_classifier = [(name + '_' + classifier_type, quant,grid) for name, quant, grid in methods_for_classifier]
         METHODS.extend(methods_for_classifier)
 
@@ -184,4 +196,3 @@ def run_experiments(classifier_types, datasets, fetch_function, sample_size,resu
 if __name__ == '__main__':
     run_experiments(('LR','NN'),qp.datasets.UCI_MULTICLASS_DATASETS,qp.datasets.fetch_UCIMulticlassDataset, 500, 'results/ucimulti','simpleheuristics')
     run_experiments(('LR','NN'),qp.datasets.UCI_MULTICLASS_DATASETS,qp.datasets.fetch_UCIMulticlassDataset, 500, 'results/ucimulti','combinations')
-    #run_experiments(qp.datasets.UCI_BINARY_DATASETS,qp.datasets.fetch_UCIBinaryDataset, 100, 'results/ucibinary')
