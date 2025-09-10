@@ -7,7 +7,7 @@ from scipy.stats import wilcoxon
 # === CONFIGURATION ===
 DATA_DIR = "results/ucimulti"
 
-methods = ['EM','EM_BCTS','PSEM','TSEM','DMAPEMv2','DEM','CSEMv2','EREMv2']
+methods = ['EM','EM_BCTS','PSEM','TSEM','DMAPEM','DEM','CSEM','EREM']
 labels = ['EMQ','Calib','Smooth','Temp','MAP','Damp','Conf','Ent']
 classifiers = ["LR", "NN"]
 datasets = qp.datasets.UCI_MULTICLASS_DATASETS
@@ -26,8 +26,6 @@ for clf in classifiers:
         for method in methods:
             if method == "EM":
                 continue
-            if method == "EM_BCTS" and clf == "NN" and dataset == "nursery":
-                continue
             filename = f"{method}_{clf}_{dataset}.dataframe"
             filepath = os.path.join(DATA_DIR, filename)
             if not os.path.exists(filepath):
@@ -36,6 +34,7 @@ for clf in classifiers:
 
             mae_other = pd.read_csv(filepath)["mae"]
             D = mae_other - mae_em
+            D = D.dropna() 
             for d in D:
                 deltas.append({
                     "Classifier": clf,
@@ -46,6 +45,7 @@ for clf in classifiers:
 
 # === AGGREGATE AND ANALYZE ===
 df = pd.DataFrame(deltas)
+
 results = []
 
 for clf in classifiers:
@@ -79,8 +79,8 @@ def format_p(p):
     try:
         p = float(p)
         if p < 1e-4:
-            return r"$\bm{<0.0001}$" if p < 0.05 else "$<0.0001$"
-        return f"\\textbf{{{p:.4f}}}" if p < 0.05 else f"{p:.4f}"
+            return r"$\bm{<0.0001}$"   # always bold
+        return f"\\bm{{{p:.4f}}}" if p < 0.05 else f"{p:.4f}"
     except:
         return str(p)
 
