@@ -7,9 +7,9 @@
 \usepackage{xcolor}
 \usepackage[linesnumbered,ruled,vlined]{algorithm2e}
 \title[Stabilizing EM‑Based Quantification]{Stabilizing EM‑Based Quantification under Label Shift}
-\author{Pablo González \textit{et al.}}
+\author{Pablo González, Olaya Pérez-Mon, Juan José del Coz}
 \institute[AI Center, Uni. Oviedo]{Artificial Intelligence Center\\University of Oviedo}
-\date{LQ 2025 · \today}
+\date{LQ 2025 · September 15, 2025}
 
 \begin{document}
 
@@ -43,6 +43,7 @@
   
   \begin{itemize}
     \item $Q(c)$: Prevalence of class $c$ in the target set.
+    \item $P(c)$: Prevalence of class $c$ in the training set.
     \item $s_i(c)$: Score (e.g., soft prediction) assigned to class $c$ by the classifier for instance $i$.
     \item $q_i^{(t)}(c)$: Estimated probability that instance $i$ belongs to class $c$ at iteration $t$.
   \end{itemize}
@@ -52,14 +53,14 @@
       \begin{block}{E‑step (Expectation)}
         \small
         Update instance-level posteriors:
-        $$q_i^{(t)}(c)=\frac{Q^{(t)}(c)\,s_i(c)}{\sum_{j}Q^{(t)}(j)\,s_i(j)}$$
+        $$q_i^{(t)}(c)=\frac{\frac{Q^{(t)}(c)}{P(c)}\,s_i(c)}{\sum_{j=1}^{K}\frac{Q^{(t)}(j)}{P(j)}\,s_i(j)}$$
       \end{block}
     \end{column}
     \begin{column}{0.4\textwidth}
       \begin{block}{M‑step (Maximization)}
         \small
         Update class prevalences:
-        $$Q^{(t+1)}(c)=\frac{1}{N}\sum_i q_i^{(t)}(c)$$
+        $$Q^{(t+1)}(c)=\frac{1}{N}\sum_{i=1}^{N}q_i^{(t)}(c)$$
       \end{block}
     \end{column}
   \end{columns}
@@ -88,7 +89,7 @@
             \item M-step: \textit{Prevalence Update} $\mathcal{U}$
           \end{itemize}
     \item Systematic taxonomy of existing \& novel stabilisation heuristics (both for the E-step and the M-step).
-    \item Exhaustive evaluation on 20+ UCI datasets with LR and NN classifiers.
+    \item Exhaustive evaluation on 20+ UCI datasets.
   \end{enumerate}
 \end{frame}
 
@@ -104,15 +105,16 @@
 Initialize prevalence estimate $Q^{(0)} \in \Delta^K$\;
 \Repeat{convergence}{
   \ForEach{instance $x_i \in \mathcal{D}_T$}{
-    Apply posterior transformation: \\
-    $\tilde{s}_i(c) \gets \textcolor{red}{\mathcal{C}}(s_i)(c)$\;
+    
     Compute reweighted posterior: \\
-    $q^{(t)}_i(c) \gets \dfrac{Q^{(t)}(c) \cdot \tilde{s}_i(c)}{\sum_{j=1}^K Q^{(t)}(j) \cdot \tilde{s}_i(j)}$\;
-  }
+    $q^{(t)}_i(c) \gets \dfrac{\frac{Q^{(t)}(c)}{P(c)} \cdot s_i(c)}{\sum_{j=1}^K \frac{Q^{(t)}(j)}{P(j)} \cdot s_i(j)}$\;
+    Apply reweighted posterior transformation: \\
+    $\tilde{q}^{(t)}_i \gets \textcolor{red}{\mathcal{C}}\!\big(q^{(t)}_i\big)$\;
+    }
   Compute raw prevalence update: \\
-  $\hat{Q}^{(t+1)}(c) \gets \dfrac{1}{n} \sum_{i=1}^n q^{(t)}_i(c)$\;
+  $\hat{Q}^{(t+1)}(c) \gets \dfrac{1}{N} \sum_{i=1}^N \tilde{q}^{(t)}_i(c)$\;
   Update prevalence estimate: \\
-  $Q^{(t+1)} \gets \textcolor{red}{\mathcal{U}}\bigl(Q^{(t)}, \hat{Q}^{(t+1)}\bigr)$\;
+ $Q^{(t+1)} \gets \textcolor{red}{\mathcal{U}}\!\bigl(Q^{(t)},\, \hat{Q}^{(t+1)},\, \{\tilde{q}^{(t)}_i\}_{i=1}^N\bigr)$\;
 }
 \Return $Q^{(t+1)}$\;
 \caption{Unified EMQ Framework}
@@ -127,11 +129,11 @@ Initialize prevalence estimate $Q^{(0)} \in \Delta^K$\;
     \small Used only once before EM begins and helps align $s_i(c)$ with true posteriors (not part of the framework).
     \normalsize
 
-    \item \textbf{Posterior Smoothing}: $\tilde{s}_i(c)\! \leftarrow\! (s_i(c)+\varepsilon)/(1+K\varepsilon)$\\
+    \item \textbf{Posterior Smoothing}: $\tilde{q}_i^{(t)}(c)\! \leftarrow\! ({q}_i^{(t)}(c)+\varepsilon)/(1+K\cdot\varepsilon)$\\
     \small Prevents zero probabilities and softens overconfident predictions, especially useful when some classes are rare or underrepresented.
     \normalsize
 
-    \item \textbf{Temperature Scaling}: $\tilde{s}_i(c) \leftarrow s_i(c)^{\tau}$ then renormalize\\
+    \item \textbf{Temperature Scaling}: $\tilde{q}_i^{(t)}(c) \leftarrow q_i^{(t)}(c)^{1/\tau}$ then renormalize\\
     \small Dynamically flattens (or sharpens) the score distribution during EM. 
     \small Applies a power transformation to soften or sharpen posteriors during EM:\\
     - \( \tau > 1 \): flattens the distribution, reducing overconfidence.\\
@@ -144,9 +146,8 @@ Initialize prevalence estimate $Q^{(0)} \in \Delta^K$\;
 % REVISAR NOTACIÓN%
 \begin{frame}{M‑Step Heuristics ($\mathcal{U}$)}
   \begin{itemize}
-    \item \textbf{MAP / Dirichlet Prior}: Add $\alpha$-1 pseudo-counts to the prevalence update $Q^{(t+1)}(c) = \frac{\sum_{i=1}^N q_i^{(t)}(c) + \alpha - 1}{N + K(\alpha - 1)}$.
-    When $\alpha>1$, the prevalence updates are pulled towards the uniform distribution. When $\alpha<1$, the prevalence updates are more peaked.\\
-    \normalsize
+    \item \textbf{MAP / Dirichlet Prior}: Add $\alpha$-1 pseudo-counts to the prevalence update $Q^{(t+1)}(c) = \frac{\sum_{i=1}^N \tilde{q}_i^{(t)}(c) + \alpha - 1}{N + K(\alpha - 1)}$.
+    When $\alpha>1$, the prevalence updates are pulled towards the uniform distribution. 
 
     \item \textbf{Damping}: Blend the new estimate with the previous one $Q^{(t+1)} \gets (1-\lambda) Q^{(t)} + \lambda \hat{Q}^{(t+1)}$   \\
     
@@ -154,7 +155,7 @@ Initialize prevalence estimate $Q^{(0)} \in \Delta^K$\;
     \normalsize
 
     \item \textbf{Confidence Selection}: Use only the most confident instances to compute $Q^{(t+1)}$.\\
-    \small Reduces the influence of uncertain predictions, filtering top-$\tau$ instances with highest max-score.
+    \small Reduces the influence of uncertain predictions, filtering top-$\kappa$ instances with highest max-score.
     \normalsize
 
     \item \textbf{Entropy Regularization}: Encourages high-entropy (i.e., smoother) prevalence vectors:\\
@@ -170,33 +171,34 @@ Initialize prevalence estimate $Q^{(0)} \in \Delta^K$\;
 \begin{frame}{Experimental Setup}
   \begin{itemize}
     \item \textbf{Datasets}: 24 multiclass UCI datasets, test bags = 1000 (per dataset), bag size = 500.
-    \item \textbf{Classifiers}: Logistic Regression (LR) and Feed‑forward NN (NN).
     \item \textbf{Metric}: Mean Absolute Error (MAE).
-    \item \textbf{Hyper‑parameters}: tuned on validation bags via \textit{QuaPy}.
-        \begin{itemize}
-            \item \texttt{EM}, \texttt{EM\_BCTS}: classifier hyperparameters only.
-            \item \texttt{Damping}: $\lambda \in [0.1, 0.2, \dots, 0.9]$.
-            \item \texttt{Posterior smoothing}: $\varepsilon \in \{10^{-6}, 10^{-5}, 10^{-4}\}$.
-            \item \texttt{Temperature scaling}: $\tau \in \{0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 2.0, 3.0, 5.0\}$.
-            \item \texttt{Entropy regularization}: $\eta \in \{0.0, 10^{-4}, 10^{-3}\}$.
-            \item \texttt{MAP}: $\alpha \in \{0.1, 0.3, 0.5, 1.0, 2.0, 5.0, 10.0\}$.
-            \item \texttt{Confiedence selection}: $\tau \in \{0.3, 0.5, 0.8, 1\}$.
-        \end{itemize}
+    \item \textbf{Hyper‑parameters}: tuned on validation bags via \textit{QuaPy} along with the classifier hyperparameters.
   \end{itemize}
+  \centering
+  \begin{table}[h]
+\centering
+\label{tab:hyperparams}
+\begin{tabular}{ll}
+Heuristic & Hyperparameter range\\
+\hline
+ \textit{Smooth} & $\epsilon \in \{\textbf{0}, 10^{-6}, 10^{-5}, 10^{-4}\}$ \\
+\textit{Temp}   & $\tau \in \{0.25, 0.5, 0.75, \textbf{1.0}, 1.25, 1.5, 2.0, 3.0, 5.0\}$ \\
+ \textit{Damp}   & $\lambda \in \{0.1, 0.2, \ldots, \textbf{1.0}\}$ \\
+ \textit{Ent}    & $\eta \in \{\textbf{0.0}, 0.0001, 0.001\}$ \\
+\textit{MAP}    & $\alpha \in \{\textbf{1.0}, 2.0, 5.0, 10.0\}$ \\
+\textit{Conf}   & $\kappa \in \{0.3, 0.5, 0.8, \textbf{1.0}\}$ \\
+\hline
+\end{tabular}
+\end{table}
 \end{frame}
 
 
 %---------------------------------------------------------
-\begin{frame}{Overall Results (LR)}
+\begin{frame}{Overall Results}
   \centering
   \includegraphics[width=0.6\linewidth]{images/results_lr.png}
 \end{frame}
 
-%---------------------------------------------------------
-\begin{frame}{Overall Results (NN)}
-  \centering
-  \includegraphics[width=0.6\linewidth]{images/results_nn.png}
-\end{frame}
 
 \begin{frame}{Bag-level: statistical analysis}
   \centering
@@ -205,17 +207,20 @@ Initialize prevalence estimate $Q^{(0)} \in \Delta^K$\;
 
 \begin{frame}{Dataset level: Win-ties-losses charts}
   \centering
-    \includegraphics[width=0.9\linewidth]{images/datasetlevel.png}
+    \includegraphics[width=0.6\linewidth]{images/datasetlevel.png}
+\end{frame}
 
-  
+\begin{frame}{Combinating heuristics}
+  \centering
+    \includegraphics[width=0.6\linewidth]{images/combinations.png}
 \end{frame}
 
 %---------------------------------------------------------
 \begin{frame}{Key Insights}
   \begin{itemize}
-    \item \textbf{Classifier and data specific}: even though some heuristic show some pretty consistent results like \textit{Entropy regularization} or \textit{MAP}, they should be considered based on the data.
-    \item \textbf{Modularity}: heuristics can act like hyper‑parameters, using a grid search to enable automatic selection.
-    \item \textbf{Proposed framework}: it allows the design of new heuristics by combining existing ones, e.g., \textit{MAP + Damping} or \textit{Entropy + Confidence Selection}.
+    \item \textbf{Dataset specific}: even though some heuristics like \textit{Entropy regularization} or \textit{MAP} show some pretty consistent results, they should be considered based on the data.
+    \item \textbf{Modularity}: heuristics can fall back to plain EMQ, using a grid search to enable automatic selection.
+    \item \textbf{Proposed framework}: it allows the design of new heuristics by combining existing ones, e.g., \textit{Smooth + MAP} or \textit{Temp + Entropy}.
   \end{itemize}
 \end{frame}
 
@@ -223,10 +228,11 @@ Initialize prevalence estimate $Q^{(0)} \in \Delta^K$\;
 \begin{frame}{Conclusions and Future work}
   \begin{itemize}
     \item We presented a \textbf{unified framework} + extensive heuristic benchmarking.
-    \item Simple heuristics can yield significant improvaments over standard EMQ.
+    \item Simple heuristics can yield significant improvements over standard EMQ.
+    \item Heuristic are lightweight, easy to implement and pretty safe to use.
     \item Future work
     \begin{itemize} 
-      \item explore the combination of heuristics.
+      \item explore automatic selection of heuristics.
       \item derive consistency guarantees.
       \item explore heuristics for other types of shifts or situations where basic EMQ might fail.
     \end{itemize}
@@ -237,8 +243,8 @@ Initialize prevalence estimate $Q^{(0)} \in \Delta^K$\;
 \begin{frame}
   \centering
   \Huge
-Questions?\\
-\\
+Questions?
+\\ 
 \vspace{1cm}
 \includegraphics[width=0.6\textwidth]{images/questions.png}
 \end{frame}
