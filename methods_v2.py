@@ -367,6 +367,30 @@ class EMQTempScaling_Damping(EMQ):
         self.damping=damping
         self.U = U_Damping
         self.C = C_TempScaling
+
+class EMQPosteriorSmoothing_DirichletMAP(EMQ):
+    def __init__(self, classifier: BaseEstimator=None, val_split=None, exact_train_prev=True, recalib=None, n_jobs=None,callback=None, epsilon_smoothing=1e-5,alpha=0.5):
+        super().__init__(classifier=classifier, val_split=val_split,exact_train_prev=exact_train_prev,recalib=recalib,n_jobs=n_jobs,callback=callback)
+        self.epsilon_smoothing=epsilon_smoothing
+        self.alpha=alpha
+        self.U = U_DirichLetMAP
+        self.C = C_PosteriorSmoothing
+
+class EMQPosteriorSmoothing_EntropyReg(EMQ):
+    def __init__(self, classifier: BaseEstimator=None, val_split=None, exact_train_prev=True, recalib=None, n_jobs=None,callback=None, epsilon_smoothing=1e-5,eta=0.01):
+        super().__init__(classifier=classifier, val_split=val_split,exact_train_prev=exact_train_prev,recalib=recalib,n_jobs=n_jobs,callback=callback)
+        self.epsilon_smoothing=epsilon_smoothing
+        self.eta=eta
+        self.U = U_EntropyReg
+        self.C = C_PosteriorSmoothing
+
+class EMQPosteriorSmoothing_Damping(EMQ):
+    def __init__(self, classifier: BaseEstimator=None, val_split=None, exact_train_prev=True, recalib=None, n_jobs=None,callback=None, epsilon_smoothing=1e-5,damping=0.5):
+        super().__init__(classifier=classifier, val_split=val_split,exact_train_prev=exact_train_prev,recalib=recalib,n_jobs=n_jobs,callback=callback)
+        self.epsilon_smoothing=epsilon_smoothing
+        self.damping=damping
+        self.U = U_Damping
+        self.C = C_PosteriorSmoothing
     
     
 
