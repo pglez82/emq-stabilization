@@ -3,5 +3,5 @@
 Experiments done for this research.
 
 1. Install the dependencies with `pip install -r requirements.txt`.
-2. Run `python run_experiments.py`.
+2. Run `python run_experiments_v2.py`.
 3. Analyze the results with the notebook `formatresults.ipynb`.

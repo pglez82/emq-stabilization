@@ -194,5 +194,5 @@ def run_experiments(classifier_types, datasets, fetch_function, sample_size,resu
     show_results(global_result_path)
 
 if __name__ == '__main__':
-    run_experiments(('LR','NN'),qp.datasets.UCI_MULTICLASS_DATASETS,qp.datasets.fetch_UCIMulticlassDataset, 500, 'results/ucimulti','simpleheuristics')
-    run_experiments(('LR','NN'),qp.datasets.UCI_MULTICLASS_DATASETS,qp.datasets.fetch_UCIMulticlassDataset, 500, 'results/ucimulti','combinations')
+    run_experiments(('LR',),qp.datasets.UCI_MULTICLASS_DATASETS,qp.datasets.fetch_UCIMulticlassDataset, 500, 'results/ucimulti','simpleheuristics')
+    run_experiments(('LR',),qp.datasets.UCI_MULTICLASS_DATASETS,qp.datasets.fetch_UCIMulticlassDataset, 500, 'results/ucimulti','combinations')
