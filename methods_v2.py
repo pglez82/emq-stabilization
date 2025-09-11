@@ -227,8 +227,9 @@ class EMQ(AggregativeSoftQuantifier):
 
             # M-step:
             qs_new = ps.mean(axis=0)
+            #In the first iteration, both Q and Q(t+1) are equal
             if self.U is not None:
-                qs = self._apply_U(ps,qs,qs_new)
+                qs = self._apply_U(ps,qs if s!=0 else qs_new, qs_new)
             else:
                 qs = qs_new
             trajectory.append(qs.copy())

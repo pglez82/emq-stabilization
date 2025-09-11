@@ -9,7 +9,7 @@ DATA_DIR = "results/ucimulti"
 
 methods = ['EM','EM_BCTS','PSEM','TSEM','DMAPEM','DEM','CSEM','EREM']
 labels = ['EMQ','Calib','Smooth','Temp','MAP','Damp','Conf','Ent']
-classifiers = ["LR", "NN"]
+classifiers = ["LR",]
 datasets = qp.datasets.UCI_MULTICLASS_DATASETS
 
 # === COLLECT D(b) VALUES ===
