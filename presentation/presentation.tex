@@ -19,7 +19,7 @@
 \end{frame}
 
 %---------------------------------------------------------
-\begin{frame}{Motivation}
+\begin{frame}{Quantification and EMQ}
   \begin{itemize}
     \item \alert{Quantification goal}: estimate \textbf{class prevalences} in an \emph{unlabelled} target sample.
     \item \textbf{Assumptions} for most quantification methods:
@@ -27,7 +27,7 @@
             \item \textbf{Prior probability shift}: $P(X\mid Y)=Q(X\mid Y)$ while $P(Y)\neq Q(Y)$.
             %\item \textbf{Well‑calibrated posteriors}: we can obtain reliable estimates of $p(y\mid x)$ from a source classifier.
           \end{itemize}
-    \item Under these conditions,  \textbf{EMQ}
+    \item Under these conditions, \textbf{EMQ}
           \begin{itemize}
             \item coincides with the maximum‑likelihood estimator,
             \item is \emph{Fisher‑consistent}: perfect estimation as the sample size grows,
@@ -215,25 +215,17 @@ Heuristic & Hyperparameter range\\
     \includegraphics[width=0.6\linewidth]{images/combinations.png}
 \end{frame}
 
-%---------------------------------------------------------
-\begin{frame}{Key Insights}
-  \begin{itemize}
-    \item \textbf{Dataset specific}: even though some heuristics like \textit{Entropy regularization} or \textit{MAP} show some pretty consistent results, they should be considered based on the data.
-    \item \textbf{Modularity}: heuristics can fall back to plain EMQ, using a grid search to enable automatic selection.
-    \item \textbf{Proposed framework}: it allows the systematic design of new heuristics.
-  \end{itemize}
-\end{frame}
 
 %---------------------------------------------------------
 \begin{frame}{Conclusions and Future work}
   \begin{itemize}
     \item We presented a \textbf{unified framework} + extensive heuristic benchmarking.
     \item Simple heuristics can yield significant improvements over standard EMQ.
-    \item Heuristic are lightweight, easy to implement and pretty safe to use.
+    \item Presented heuristics are lightweight, easy to implement and pretty safe to use, even though they should be considered based on the data.
     \item Future work
     \begin{itemize} 
       \item explore automatic selection of heuristics.
-      \item derive consistency guarantees.
+      \item derive consistency guarantees (what properties should the functions $\mathcal{C}$ and $\mathcal{U}$ have so the resulting method is still Fisher consistent?).
       \item explore heuristics for other types of shifts or situations where basic EMQ might fail.
     \end{itemize}
   \end{itemize}
