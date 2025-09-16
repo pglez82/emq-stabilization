@@ -96,6 +96,6 @@ df_latex["Wilcoxon p-value"] = df_latex["Wilcoxon p-value"].apply(format_p)
 
 # Save to LaTeX
 latex_table = df_latex.to_latex(index=False, escape=False, column_format="llcccc", float_format="%.5f")
-with open("bag_level_summary.tex", "w") as f:
+with open("paper/bag_level_summary.tex", "w") as f:
     f.write(latex_table)
 
