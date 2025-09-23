@@ -5,7 +5,7 @@ import quapy as qp
 from scipy.stats import wilcoxon
 
 # === CONFIGURATION ===
-DATA_DIR = "results/ucimulti"
+DATA_DIR = "results/ucimulti2"
 
 methods = ['EM','EM_BCTS','PSEM','TSEM','DMAPEM','DEM','CSEM','EREM']
 labels = ['EMQ','Calib','Smooth','Temp','MAP','Damp','Conf','Ent']
@@ -86,8 +86,8 @@ def format_p(p):
 
 # Round values and format p-values
 df_latex = summary_df.copy()
-df_latex["Mean (MAE)"] = df_latex["Mean (MAE)"].astype(float).round(5)
-df_latex["Std"] = df_latex["Std"].astype(float).round(5)
+df_latex["Mean (MAE)"] = df_latex["Mean (MAE)"].astype(float).round(4)
+df_latex["Std"] = df_latex["Std"].astype(float).round(4)
 df_latex["% Wins"] = (df_latex["% Wins"]).round(2).astype(str)
 df_latex["Wilcoxon p-value"] = df_latex["Wilcoxon p-value"].apply(format_p)
 
@@ -95,7 +95,7 @@ df_latex["Wilcoxon p-value"] = df_latex["Wilcoxon p-value"].apply(format_p)
 #df_latex = df_latex.sort_values(by=["Classifier", "Mean Δ (MAE)"])
 
 # Save to LaTeX
-latex_table = df_latex.to_latex(index=False, escape=False, column_format="llcccc", float_format="%.5f")
+latex_table = df_latex.to_latex(index=False, escape=False, column_format="llcccc", float_format="%.4f")
 with open("paper/bag_level_summary.tex", "w") as f:
     f.write(latex_table)
 

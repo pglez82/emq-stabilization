@@ -256,18 +256,18 @@ def C_TempScaling(posterior_probabilities, tau):
     Px /= Px.sum(axis=1, keepdims=True)
     return Px
 
-def U_Damping(posterior_probabilities, qs, qs_new,damping):
-    return damping * qs_new + (1 - damping) * qs
+def U_Damping(posterior_probabilities, qs, qs_new,lambd):
+    return lambd * qs_new + (1 - lambd) * qs
 
 def U_DirichLetMAP(posterior_probabilities,qs,qs_new,alpha):
     N = posterior_probabilities.shape[0]
     K = posterior_probabilities.shape[1]
     return (posterior_probabilities.sum(axis=0) + alpha - 1) / (N + K * (alpha - 1))
 
-def U_ConfidentSubset(posterior_probabilities,qs,qs_new,tau):
-    if tau < 1.0:
+def U_ConfidentSubset(posterior_probabilities,qs,qs_new,kappa):
+    if kappa < 1.0:
         max_probs = posterior_probabilities.max(axis=1)
-        threshold = np.quantile(max_probs, 1 - tau)
+        threshold = np.quantile(max_probs, 1 - kappa)
         subset_mask = max_probs >= threshold
         ps_subset = posterior_probabilities[subset_mask]
     else:
@@ -317,9 +317,9 @@ class EMQTempScaling(EMQ):
         self.C = C_TempScaling
 
 class EMQDamping(EMQ):
-    def __init__(self, classifier: BaseEstimator=None, val_split=None, exact_train_prev=True, recalib=None, n_jobs=None,callback=None, damping=0.5):
+    def __init__(self, classifier: BaseEstimator=None, val_split=None, exact_train_prev=True, recalib=None, n_jobs=None,callback=None, lambd=0.5):
         super().__init__(classifier=classifier, val_split=val_split,exact_train_prev=exact_train_prev,recalib=recalib,n_jobs=n_jobs,callback=callback)
-        self.damping=damping
+        self.lambd=lambd
         self.U = U_Damping
 
 class EMQDirichletMAP(EMQ):
@@ -331,10 +331,10 @@ class EMQDirichletMAP(EMQ):
 
 class EMQConfidentSubset(EMQ):
     def __init__(self, classifier=None, val_split=None, exact_train_prev=True, recalib=None,
-                 n_jobs=None, callback=None, tau=1.0):
+                 n_jobs=None, callback=None, kappa=1.0):
         super().__init__(classifier, val_split, exact_train_prev, recalib, n_jobs, callback)
-        assert 0 < tau <= 1, "tau must be in (0, 1]"
-        self.tau = tau
+        assert 0 < kappa <= 1, "kappa must be in (0, 1]"
+        self.kappa = kappa
         self.U = U_ConfidentSubset
 
 
@@ -362,10 +362,10 @@ class EMQTempScaling_EntropyReg(EMQ):
         self.C = C_TempScaling
 
 class EMQTempScaling_Damping(EMQ):
-    def __init__(self, classifier: BaseEstimator=None, val_split=None, exact_train_prev=True, recalib=None, n_jobs=None,callback=None, tau=1.0,damping=0.5):
+    def __init__(self, classifier: BaseEstimator=None, val_split=None, exact_train_prev=True, recalib=None, n_jobs=None,callback=None, tau=1.0,lambd=0.5):
         super().__init__(classifier=classifier, val_split=val_split,exact_train_prev=exact_train_prev,recalib=recalib,n_jobs=n_jobs,callback=callback)
         self.tau=tau
-        self.damping=damping
+        self.lambd=lambd
         self.U = U_Damping
         self.C = C_TempScaling
 
@@ -386,10 +386,10 @@ class EMQPosteriorSmoothing_EntropyReg(EMQ):
         self.C = C_PosteriorSmoothing
 
 class EMQPosteriorSmoothing_Damping(EMQ):
-    def __init__(self, classifier: BaseEstimator=None, val_split=None, exact_train_prev=True, recalib=None, n_jobs=None,callback=None, epsilon_smoothing=1e-5,damping=0.5):
+    def __init__(self, classifier: BaseEstimator=None, val_split=None, exact_train_prev=True, recalib=None, n_jobs=None,callback=None, epsilon_smoothing=1e-5,lambd=0.5):
         super().__init__(classifier=classifier, val_split=val_split,exact_train_prev=exact_train_prev,recalib=recalib,n_jobs=n_jobs,callback=callback)
         self.epsilon_smoothing=epsilon_smoothing
-        self.damping=damping
+        self.lambd=lambd
         self.U = U_Damping
         self.C = C_PosteriorSmoothing
     

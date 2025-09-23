@@ -61,17 +61,17 @@ def load_timings(result_path):
 
 def get_heuristic_parameters(heuristic):
     if heuristic == 'PSEM':
-        return {'epsilon_smoothing': (0, 1e-6, 1e-5, 1e-4)}
+        return {'epsilon_smoothing': (0, 1e-6, 1e-5, 1e-4, 1e-3, 1e-2)}
     elif heuristic == 'TSEM':
         return {'tau': (0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 2.0, 3.0, 5.0)}
     elif heuristic == 'DEM':
-        return {'damping': np.linspace(0.1, 1, 9)}
+        return {'lambd': np.linspace(0.1, 1, 10)}
     elif heuristic == 'EREM':
         return {'eta' : (0.0,0.0001,0.001)}
     elif heuristic == 'DMAPEM':
         return {'alpha': (1.0, 2.0, 5.0, 10.0)}
     elif heuristic == 'CSEM':
-        return {'tau': (0.3,0.5,0.8,1)}
+        return {'kappa': (0.3,0.5,0.8,1)}
     else:
         raise ValueError(f"Unknown heuristic: {heuristic}")
 
@@ -165,6 +165,8 @@ def run_experiments(classifier_types, datasets, fetch_function, sample_size,resu
                             model.fit(train)
 
                             print(f'best params {model.best_params_}')
+                            with open('bestparams/{}_{}.pkl'.format(method_name,dataset), 'wb') as f:
+                                pickle.dump(model.best_params_, f)
                             print(f'best score {model.best_score_}')
 
                             quantifier = model.best_model()
@@ -194,5 +196,5 @@ def run_experiments(classifier_types, datasets, fetch_function, sample_size,resu
     show_results(global_result_path)
 
 if __name__ == '__main__':
-    run_experiments(('LR',),qp.datasets.UCI_MULTICLASS_DATASETS,qp.datasets.fetch_UCIMulticlassDataset, 500, 'results/ucimulti','simpleheuristics')
-    run_experiments(('LR',),qp.datasets.UCI_MULTICLASS_DATASETS,qp.datasets.fetch_UCIMulticlassDataset, 500, 'results/ucimulti','combinations')
+    run_experiments(('LR',),qp.datasets.UCI_MULTICLASS_DATASETS,qp.datasets.fetch_UCIMulticlassDataset, 500, 'results/ucimulti2','simpleheuristics')
+    run_experiments(('LR',),qp.datasets.UCI_MULTICLASS_DATASETS,qp.datasets.fetch_UCIMulticlassDataset, 500, 'results/ucimulti2','combinations')
