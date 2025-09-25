@@ -41,27 +41,27 @@ def plot_combined_histogram(ax,hist,subtitle):
     ax.set_xticks(bins)
     ax.title.set_text(subtitle)
 
-class PerfectProbClassifier:
-    def __init__(self, mu1, std1, mu2, std2):
-        self.mu1 = mu1
-        self.std1 = std1
-        self.mu2 = mu2
-        self.std2 = std2
-        self.classes_ = np.array([0, 1])
+    
+class NoisyProbClassifier:
+    def __init__(self,beta0=0.0,beta1=2.0):
+        self.beta0=beta0
+        self.beta1=beta1
 
-    def _compute_probabilities(self, x, mu1, std1, mu2, std2):
-        den1 = 1.0 / (std1 * np.sqrt(2 * np.pi))
-        den2 = 1.0 / (std2 * np.sqrt(2 * np.pi))
-        pdf1 = den1 * np.exp(-(x - mu1) ** 2 / (2 * std1 ** 2))
-        pdf2 = den2 * np.exp(-(x - mu2) ** 2 / (2 * std2 ** 2))
-        p0 = pdf1 / (pdf1 + pdf2)
-        return np.column_stack([p0, 1 - p0])
+    def _compute_probabilities(self, x, beta0, beta1):
+        """
+        Cuando mu1 y mu2 son -1 y 1 y std es 1, todo se reduce a la función logística
+        Devuelve las probabilidades posteriores [P(Y=0|x), P(Y=1|x)]
+        usando un modelo logístico parametrizado con beta0, beta1.
+        """
+        p1 = 1 / (1 + np.exp(-(beta0 + beta1 * x)))   # P(Y=1|x)
+        p0 = 1 - p1
+        return np.column_stack([p0, p1])
     
     def fit(self, X, y):
         pass
 
     def predict_proba(self, x):
-        return self._compute_probabilities(x, self.mu1, self.std1, self.mu2, self.std2)
+        return self._compute_probabilities(x, self.beta0,self.beta1)
     
     
     def predict(self, x):
@@ -69,7 +69,8 @@ class PerfectProbClassifier:
         return np.argmax(probs, axis=1)
     
 
-def run_experiment(est_name, seed, param, ntrain, ntest, nreps, nbags, save_all):
+
+def run_experiment(est_name, seed, ntrain, ntest, beta0, beta1, nreps, nbags, save_all):
     """ Run a single experiment
 
         Parameters
@@ -80,16 +81,11 @@ def run_experiment(est_name, seed, param, ntrain, ntest, nreps, nbags, save_all)
         seed: int
             Seed of the experiment
 
-        param: int, str
-            Extra oarameter for the definition of the problem.
-            If dim==1, this value is the std.
-            If dim=2 this value is an string to indicate if the dataset is the one designed to test HDX
-
         ntrain : list
-            Training examples that must be tested
+            List with the number of training examples that must be tested, e.g.,[50, 100, 200]
 
         ntest: int
-            List with the number of testing instances in each bag e.g.,[50, 100, 200]
+            Number of testing instances in each bag
 
         nreps: int
             Number of training datasets created
@@ -98,21 +94,23 @@ def run_experiment(est_name, seed, param, ntrain, ntest, nreps, nbags, save_all)
             Number of testing bags created for each training datasets.
             The total number of experiments will be nreps * nbags
 
-        nfolds: int
-            Number of folds used to estimate the training distributions by the methods AC, HDy and EDy
-
         save_all: bool
             True if the results of each single experiment must be saved
         
     """
 
     mu1 = -1
-    std1 = param
+    std1 = 1
     mu2 = 1
-    std2 = std1
+    std2 = 1
 
-    if est_name == 'PerfectProbClassifier':
-        estimator = PerfectProbClassifier(mu1, std1, mu2, std2)
+    # range of testing prevalences
+    low = round(ntest * 0.05)
+    high = round(ntest * 0.95)
+    qp.environ["SAMPLE_SIZE"] = ntest
+
+    if est_name == 'NoisyProbClassifier':
+        estimator = NoisyProbClassifier()
     elif est_name == 'LR':
         estimator = LogisticRegression(C=1, random_state=seed, max_iter=10000, solver='liblinear')
     else:
@@ -132,44 +130,47 @@ def run_experiment(est_name, seed, param, ntrain, ntest, nreps, nbags, save_all)
     methods_names = ['PCC','EMQ']
 
     heuristics = {'PSEM':"EMQPosteriorSmoothing",'TSEM':'EMQTempScaling','DEM':'EMQDamping','EREM':'EMQEntropyReg','DMAPEM':'EMQDirichletMAP','CSEM':'EMQConfidentSubset'}
-    for heuristic,c in heuristics.items():
-        hiperparam_values = get_heuristic_parameters(heuristic)
-        print(hiperparam_values)
-        hiper_name,hiper_values = next(iter(hiperparam_values.items()))
-        for hiper_value in hiper_values:
-            method = globals()[c](estimator)
-            setattr(method, hiper_name,hiper_value)
-            methods.append(method)
-            
-            methods_names.append(heuristic+hiper_name+str(hiper_value))
+    #heuristics = []
+    if len(heuristics)>0:
+        for heuristic,c in heuristics.items():
+            hiperparam_values = get_heuristic_parameters(heuristic)
+            print(hiperparam_values)
+            hiper_name,hiper_values = next(iter(hiperparam_values.items()))
+            for hiper_value in hiper_values:
+                method = globals()[c](estimator)
+                setattr(method, hiper_name,hiper_value)
+                methods.append(method)
+                
+                methods_names.append(heuristic+hiper_name+str(hiper_value))
 
     print(methods_names)
 
+    #compute possible combinations of values beta0 and beta1
+    betas = []
+    for b0 in beta0:
+        for b1 in beta1:
+            betas.append((b0,b1))
+
     #   to store the results
-    mae_results = np.zeros((len(methods_names), len(ntest)))
-    sqe_results = np.zeros((len(methods_names), len(ntest)))
-    mrae_results = np.zeros((len(methods_names), len(ntest)))
-    classif_results = np.zeros((2, len(ntest)))
+    mae_results = np.zeros((len(methods_names), len(betas)))
+    sqe_results = np.zeros((len(methods_names), len(betas)))
+    mrae_results = np.zeros((len(methods_names), len(betas)))
+    classif_results = np.zeros((2, len(betas)))
 
     if save_all:
-        name_file = 'results/artificial/timeArtificialBinary-avg-' + str(param) + '-' + est_name + '-rep' + str(nreps) + \
-                    '-ntest' + str(ntest) + '.txt'
+        name_file = 'results/artificial/timeArtificialBinaryAlter-avg-' + '-' + est_name + '-rep' + str(nreps) + \
+                    '-ntest' + str(ntest) + 'beta0'+str(beta0)+'beta1'+str(beta1)+'.txt'
         file_times = open(name_file, 'w')
         file_times.write('#examples, ')
         for index, m in enumerate(methods_names):
             file_times.write('%s, ' % m)
 
-    name_file = 'results/artificial/artificialBinary-avg-' + str(param) + '-' + est_name + '-rep' + str(nreps) + \
-                '-ntrain'+str(ntrain)+'-ntest' + str(ntest)
+    name_file = 'results/artificial/artificialBinaryAlter-avg-' + '-' + est_name + '-rep' + str(nreps) + \
+                '-ntrain'+str(ntrain)+'-ntest' + str(ntest) + 'beta0'+str(beta0)+'beta1'+str(beta1)
+    
     plt.rcParams.update({'figure.max_open_warning': 0})
     
-
-    for k in range(len(ntest)):
-        # range of testing prevalences
-        low = round(ntest[k] * 0.05)
-        high = round(ntest[k] * 0.95)
-        qp.environ["SAMPLE_SIZE"] = ntest[k]
-
+    for k in range(len(betas)):
         all_mae_results = np.zeros((len(methods_names), nreps * nbags))
         all_sqe_results = np.zeros((len(methods_names), nreps * nbags))
         all_mrae_results = np.zeros((len(methods_names), nreps * nbags))
@@ -177,16 +178,19 @@ def run_experiment(est_name, seed, param, ntrain, ntest, nreps, nbags, save_all)
         execution_times = np.zeros(len(methods_names))
 
         print()
-        print('#Test examples ', ntest[k], 'Rep#', end=' ')
+        print('#Beta0 = ', betas[k][0], 'Beta1 = ', betas[k][1], 'Rep#', end=' ')
 
         for rep in range(nreps):
-
             print(rep+1, end=' ')
+
+            estimator.beta0 = betas[k][0]
+            estimator.beta1 = betas[k][1]
 
             x_train = np.vstack(((std1 * rng.randn(ntrain, 1) + mu1), (std2 * rng.randn(ntrain, 1) + mu2)))
             y_train = np.hstack((np.zeros(ntrain, dtype=int), np.ones(ntrain, dtype=int)))
 
             estimator_train = estimator
+            #This does nothing int this experiments
             estimator_train.fit(x_train, y_train)
             #predictions_train = estimator_train.predict_proba(x_train)
 
@@ -197,7 +201,7 @@ def run_experiment(est_name, seed, param, ntrain, ntest, nreps, nbags, save_all)
 
             for n_bag in range(nbags):
                 ps = rng.randint(low, high, 1)
-                ps = np.append(ps, [0, ntest[k]])
+                ps = np.append(ps, [0, ntest])
                 ps = np.diff(np.sort(ps))
 
               
@@ -215,7 +219,7 @@ def run_experiment(est_name, seed, param, ntrain, ntest, nreps, nbags, save_all)
                 classif_results[1, k] = classif_results[1, k] + brier_score_loss(indices_to_one_hot(y_test, 2)[:, 0],
                                                                                  predictions_test[:, 0])
 
-                prev_true = ps[1] / ntest[k]
+                prev_true = ps[1] / ntest
 
                 for nmethod, method in enumerate(methods):
 
@@ -235,13 +239,13 @@ def run_experiment(est_name, seed, param, ntrain, ntest, nreps, nbags, save_all)
         execution_times = execution_times / (nreps * nbags)
 
         if save_all:
-            file_times.write('\n%d, ' % ntest[k])
+            file_times.write('\n%d, ' % ntest)
             for i in execution_times:
                 file_times.write('%.5f, ' % i)
 
         if save_all:
-            name_file = 'results/artificial/artificialBinary-all-mae-' + str(param) + '-' + est_name + \
-                        '-rep' + str(nreps) + '-value' + str(ntrain) + '-ntest' + str(ntest[k]) + '.txt'
+            name_file = 'results/artificial/artificialBinaryAlter-all-mae-' + '-' + est_name + \
+                        '-rep' + str(nreps) + '-value' + str(ntrain) + '-ntest' + str(ntest) + 'beta0'+str(beta0)+'beta1'+str(beta1) + '.txt'
             file_all = open(name_file, 'w')
 
             for method_name in methods_names:
@@ -254,8 +258,8 @@ def run_experiment(est_name, seed, param, ntrain, ntest, nreps, nbags, save_all)
                     file_all.write('\n')
             file_all.close()
 
-            name_file = 'results/artificial/artificialBinary-all-mrae-' + str(param) + '-' + est_name + \
-                        '-rep' + str(nreps) + '-value' + str(ntrain) + '-ntest' + str(ntest[k]) + '.txt'
+            name_file = 'results/artificial/artificialBinaryAlter-all-mrae-' + '-' + est_name + \
+                        '-rep' + str(nreps) + '-value' + str(ntrain) + '-ntest' + str(ntest) + 'beta0'+str(beta0)+'beta1'+str(beta1) + '.txt'
             file_all = open(name_file, 'w')
 
             for method_name in methods_names:
@@ -268,8 +272,8 @@ def run_experiment(est_name, seed, param, ntrain, ntest, nreps, nbags, save_all)
                     file_all.write('\n')
             file_all.close()
 
-            name_file = 'results/artificial/artificialBinary-all-sqe-' + str(param) + '-' + est_name + \
-                        '-rep' + str(nreps) + '-value' + str(ntrain) + '-ntest' + str(ntest[k]) + '.txt'
+            name_file = 'results/artificial/artificialBinaryAlter-all-sqe-' + '-' + est_name + \
+                        '-rep' + str(nreps) + '-value' + str(ntrain) + '-ntest' + str(ntest) + 'beta0'+str(beta0)+'beta1'+str(beta1) + '.txt'
             file_all = open(name_file, 'w')
 
             for method_name in methods_names:
@@ -287,21 +291,23 @@ def run_experiment(est_name, seed, param, ntrain, ntest, nreps, nbags, save_all)
     sqe_results = sqe_results / (nreps * nbags)
     classif_results = classif_results / (nreps * nbags)
 
-    file_avg = open('results/artificial/averages.txt', 'w')
+    file_avg = open('results/artificial/averagesAlter.txt', 'w')
 
     #Create a beautiful table with the results
-    columns = ['#examples','Error']+methods_names+['BrierLoss']
-    mae = pd.DataFrame(np.zeros((len(ntest),len(columns))),columns=columns)
-    mrae = pd.DataFrame(np.zeros((len(ntest),len(columns))),columns=columns)
-    sqe = pd.DataFrame(np.zeros((len(ntest),len(columns))),columns=columns)
-    for index, number in enumerate(ntest):
-        mae.iloc[index,0] = mrae.iloc[index,0] = sqe.iloc[index,0] = number
-        mae.iloc[index,1] = mrae.iloc[index,1] = sqe.iloc[index,1] = classif_results[0,index]
-        mae.iloc[index,2:2+len(methods_names)]=mae_results[:,index]
-        mrae.iloc[index,2:2+len(methods_names)]=mrae_results[:,index]
-        sqe.iloc[index,2:2+len(methods_names)]=sqe_results[:,index]
-        mae.iloc[index,2+len(methods_names)]=mrae.iloc[index,2+len(methods_names)]=sqe.iloc[index,2+len(methods_names)]=classif_results[1,index]
+    columns = ['#beta0','#beta1','Error']+methods_names+['BrierLoss']
+    mae = pd.DataFrame(np.zeros((len(betas),len(columns))),columns=columns)
+    mrae = pd.DataFrame(np.zeros((len(betas),len(columns))),columns=columns)
+    sqe = pd.DataFrame(np.zeros((len(betas),len(columns))),columns=columns)
+    for index, beta in enumerate(betas):
+        mae.iloc[index,0] = mrae.iloc[index,0] = sqe.iloc[index,0] = beta[0]
+        mae.iloc[index,1] = mrae.iloc[index,1] = sqe.iloc[index,1] = beta[1]
+        mae.iloc[index,2] = mrae.iloc[index,2] = sqe.iloc[index,2] = classif_results[0,index]
+        mae.iloc[index,3:3+len(methods_names)]=mae_results[:,index]
+        mrae.iloc[index,3:3+len(methods_names)]=mrae_results[:,index]
+        sqe.iloc[index,3:3+len(methods_names)]=sqe_results[:,index]
+        mae.iloc[index,3+len(methods_names)]=mrae.iloc[index,3+len(methods_names)]=sqe.iloc[index,3+len(methods_names)]=classif_results[1,index]
     fmtformat=[".0f"]+[".4f"]*(len(methods_names)+2)
+    mae.to_csv("maeAlter.csv", index=False)
     file_avg.write('MAE\n')
     file_avg.write(tabulate.tabulate(mae, tablefmt='presto', headers=mae.columns.tolist(), numalign='right', stralign='center',showindex="never",floatfmt=fmtformat))
     file_avg.write('\n\nMRAE\n')
@@ -318,5 +324,7 @@ def run_experiment(est_name, seed, param, ntrain, ntest, nreps, nbags, save_all)
 # MAIN
 # 1D synthetic experiments
 if __name__ == "__main__":
-    run_experiment(est_name="PerfectProbClassifier", seed=42, param=1.0, ntrain=50, ntest=[100,200,300,400,500,600,700,800,900,1000],
-            nreps=20, nbags=50, save_all=True)
+    beta0 = [ -1, 0, 1 ]
+    beta1 = [ 1, 2.0, 3.0 ]
+    run_experiment(est_name="NoisyProbClassifier", seed=42, ntrain=50, ntest=1000, beta0=beta0,beta1=beta1,
+            nreps=1, nbags=50, save_all=True)
