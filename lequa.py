@@ -14,6 +14,8 @@ import os
 from pathlib import Path
 from time import time
 
+SEED = 1
+
 
 def run_experiment(classifier_types=['LR'], experiment_type='simpleheuristics'):
     qp.environ['N_JOBS'] = -1
@@ -65,19 +67,27 @@ def run_experiment(classifier_types=['LR'], experiment_type='simpleheuristics'):
         print('Init method', method_name)
         with open(global_result_path + '.csv', 'at') as csv:
             for dataset in datasets:
-                if dataset == 'T1A' or dataset == 'T1B':
-                    training, val_generator, test_generator = fetch_lequa2022(task=dataset, data_home='data/lequa2022')
-                    qp.environ['SAMPLE_SIZE'] = LEQUA2022_SAMPLE_SIZE[dataset]
-                elif dataset == 'T1' or dataset == 'T2':
-                    training, val_generator, test_generator = fetch_lequa2024(task=dataset, data_home='data/lequa2024')
-                    qp.environ['SAMPLE_SIZE'] = LEQUA2024_SAMPLE_SIZE[dataset]
+                print('init', dataset)
                 local_result_path = os.path.join(Path(global_result_path).parent, method_name + '_' + dataset + '.dataframe')
-                model = GridSearchQ(quantifier, param_grid, protocol=val_generator, error='mae', refit=False, verbose=True)
-                t_init = time()
-                quantifier = model.fit(training)
-                timings[method_name][dataset] = time() - t_init
-                report = evaluation_report(quantifier, protocol=test_generator, error_metrics=['mae', 'mrae', 'mkld'], verbose=True)
-                report.to_csv(local_result_path)
+                if os.path.exists(local_result_path):
+                    print(f'result file {local_result_path} already exist; skipping')
+                    report = qp.util.load_report(local_result_path)
+                else:
+                    with qp.util.temp_seed(SEED):
+                        if dataset == 'T1A' or dataset == 'T1B':
+                            training, val_generator, test_generator = fetch_lequa2022(task=dataset, data_home='data/lequa2022')
+                            qp.environ['SAMPLE_SIZE'] = LEQUA2022_SAMPLE_SIZE[dataset]
+                        elif dataset == 'T1' or dataset == 'T2':
+                            training, val_generator, test_generator = fetch_lequa2024(task=dataset, data_home='data/lequa2024')
+                            qp.environ['SAMPLE_SIZE'] = LEQUA2024_SAMPLE_SIZE[dataset]
+                        local_result_path = os.path.join(Path(global_result_path).parent, method_name + '_' + dataset + '.dataframe')
+                        model = GridSearchQ(quantifier, param_grid, protocol=val_generator, error='mae', refit=False, verbose=True)
+                        t_init = time()
+                        model.fit(training)
+                        timings[method_name][dataset] = time() - t_init
+                        best_model = model.best_model()
+                        report = evaluation_report(best_model, protocol=test_generator, error_metrics=['mae', 'mrae', 'mkld'], verbose=True)
+                        report.to_csv(local_result_path)
 
                 means = report.mean(numeric_only=True)
                 if method_name not in timings or dataset not in timings[method_name]:
