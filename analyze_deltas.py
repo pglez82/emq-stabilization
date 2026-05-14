@@ -5,7 +5,7 @@ import quapy as qp
 from scipy.stats import wilcoxon
 
 # === CONFIGURATION ===
-DATA_DIR = "results/ucimulti2"
+DATA_DIR = "results/ucimulti"
 
 methods = ['EM','EM_BCTS','PSEM','TSEM','DMAPEM','DEM','CSEM','EREM']
 labels = ['EMQ','Calib','Smooth','Temp','MAP','Damp','Conf','Ent']
